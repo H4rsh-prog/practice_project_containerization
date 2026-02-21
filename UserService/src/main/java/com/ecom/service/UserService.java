@@ -9,6 +9,7 @@ import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Fallback;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
@@ -18,7 +19,9 @@ import com.ecom.dto.UserRepository;
 import com.ecom.factory.util.DEBUG;
 import com.ecom.model.entity.UserEntity;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.netflix.hystrix.contrib.javanica.annotation.HystrixCommand;
 
 import feign.FeignException;
 import jakarta.annotation.PostConstruct;
@@ -33,6 +36,7 @@ public class UserService {
 	private EmailClient emailClient;
 	@Autowired
 	private DEBUG debugClient;
+	
 	
 	public ResponseEntity<?> getUserByUsername(String username) throws JsonProcessingException{
 		com.ecom.factory.model.response.User userResponse;
@@ -100,51 +104,68 @@ public class UserService {
 	public boolean checkUsernameAvailability(String username) {
 		return !this.repo.existsByUsername(username);
 	}
-	
-	public ResponseEntity<?> saveUser(com.ecom.factory.model.request.User userRequest) throws JsonProcessingException {
-		debugClient.print("RECEIVED ENTITY SAVE REQUEST FOR "+userRequest);
+	public ResponseEntity<?> availabilityCheck(com.ecom.factory.model.request.User userRequest) {
 		if(!checkUsernameAvailability(userRequest.getUsername())) return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("USERNAME NOT AVAILABLE");
 		debugClient.print("USERNAME AVAILABLE");
 		if(!emailClient.checkEmailAvailability(userRequest.getEmailAddress())) return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("EMAIL NOT AVAILABLE");
 		debugClient.print("EMAIL AVAILABLE");
-		String json = this.mapper.writeValueAsString(userRequest);
+		return ResponseEntity.ok("AVAILABLE");
+	}
+	public ResponseEntity<?> saveUserEntity(UserEntity entity) {
 		debugClient.print("SAVING ENTITY TO DATABASE");
-		Optional<UserEntity> entity = Optional.of(this.repo.save(
-					this.mapper.readValue(json, UserEntity.class)
-				));
-		if(entity.isEmpty()) return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("COULD NOT SAVE USER ENTITY");
-		debugClient.print("ENTITY SAVED WITH ID "+entity.get().getId());
-		com.ecom.factory.model.request.Email emailRequest = this.mapper.readValue(json, com.ecom.factory.model.request.Email.class);
-		emailRequest.setId(entity.get().getId());
+		Optional<UserEntity> savedEntity = Optional.of(this.repo.save(entity));
+		if(savedEntity.isEmpty()) return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("COULD NOT SAVE USER ENTITY");
+		debugClient.print("ENTITY SAVED WITH ID "+savedEntity.get().getId());
+		return ResponseEntity.ok(savedEntity.get());
+	}
+	public ResponseEntity<?> saveEmailEntity(com.ecom.factory.model.request.Email emailRequest){
 		debugClient.print("SENDING EMAIL MAPPING REQUEST "+emailRequest);
+		ResponseEntity<?> clientResponse = emailClient.postEmailEntity(emailRequest);
+		debugClient.print("FEIGN CLIENT RETURNED WITH THE RESPONSE "+clientResponse);
+		return clientResponse;
+	}
+	@HystrixCommand(commandKey = "saveRevert", fallbackMethod = "revertSaveUser")
+	public ResponseEntity<?> saveUser(com.ecom.factory.model.request.User userRequest) {
+		debugClient.print("RECEIVED ENTITY SAVE REQUEST FOR "+userRequest);
+		ResponseEntity<?> responseEntity = this.availabilityCheck(userRequest);
+		if(responseEntity.getStatusCode().is4xxClientError()) return ResponseEntity.status(responseEntity.getStatusCode()).body(responseEntity.getBody());
 		try {
-			ResponseEntity<?> clientResponse = emailClient.postEmailEntity(emailRequest);
-			debugClient.print("FEIGN CLIENT RETURNED WITH THE RESPONSE "+clientResponse);
-			debugClient.print("letting request pass : "+!(clientResponse.getStatusCode().is2xxSuccessful()));
-			if(!(clientResponse.getStatusCode().is2xxSuccessful())) {
-				debugClient.print("EMAIL MAPPING FAILED ATTEMPTING TO ROLL BACK CHANGES");
-				this.repo.delete(entity.get());
-				debugClient.print("ROLLING BACK CHANGES NO CHANGES MADE");
-				return ResponseEntity.status(clientResponse.getStatusCode()).body("UNMAPPED EMAIL EXCEPTION");
-			}
-			com.ecom.factory.model.response.Email emailResponse = this.mapper.readValue(
-						this.mapper.writeValueAsString(clientResponse.getBody()), com.ecom.factory.model.response.Email.class
+			//PARSING USER ENTITY OBJECT
+			String userRequestJSON = this.mapper.writeValueAsString(userRequest);
+			responseEntity = saveUserEntity(this.mapper.readValue(userRequestJSON, UserEntity.class));
+			if(responseEntity.getStatusCode().is5xxServerError()) return ResponseEntity.status(responseEntity.getStatusCode()).body(responseEntity.getBody());
+			UserEntity entity = (UserEntity) responseEntity.getBody();
+			//PARSING EMAIL ENTITY OBJECT
+			com.ecom.factory.model.request.Email emailRequest = this.mapper.readValue(userRequestJSON, com.ecom.factory.model.request.Email.class);
+			emailRequest.setId(entity.getId());
+			responseEntity = saveEmailEntity(emailRequest);
+			//COMPILING USER RESPONSE
+			debugClient.print("COMPILING USER RESPONSE");
+			com.ecom.factory.model.response.Email emailResponse;
+			emailResponse = this.mapper.readValue(
+						this.mapper.writeValueAsString(responseEntity.getBody()), 
+						com.ecom.factory.model.response.Email.class
 					);
-			debugClient.print("EMAIL MAPPED");
+			debugClient.print("EMAIL RESPONSE COMPILED");
 			com.ecom.factory.model.response.User userResponse = this.mapper.readValue(
 						this.mapper.writeValueAsString(entity),
 						com.ecom.factory.model.response.User.class
 					);
 			userResponse.setEmail(emailResponse);
+			debugClient.print("USER RESPONSE COMPILED");
 			return ResponseEntity.status(HttpStatus.CREATED).body(userResponse);
-		} catch (FeignException e) {
-			debugClient.print("FEIGN CLIENT FAILED");
-			this.repo.delete(entity.get());
-			debugClient.print("ROLLING BACK CHANGES NO CHANGES MADE");
-			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("INTERNAL SERVER ERROR NO CHANGES WERE MADE");
-		} catch (Exception e) {
-			e.printStackTrace();
+		} catch (JsonProcessingException e) {
+			debugClient.print("EXCEPTION CAUGHT WHILE PROCESSESING JSON VIA OBJECTMAPPER");
+			debugClient.print(e.getMessage());
 		}
-		return null;
+		return ResponseEntity.status(HttpStatus.EXPECTATION_FAILED).body("[SAVE-USER]	UNEXPECTED BYPASS DID NOT ENTER FALLBACK");
+	}
+	public ResponseEntity<?> revertSaveUser(com.ecom.factory.model.request.User userRequest){
+		Optional<UserEntity> entity = this.repo.findByUsername(userRequest.getUsername());
+		if(entity.isPresent()) {
+			this.repo.delete(entity.get());
+			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("[FALLBACK]	REVERTED ENTITY SAVE NO CHANGES WERE MADE");
+		}
+		return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("[FALLBACK]	ENTITY WAS NOT SAVED");
 	}
 }
