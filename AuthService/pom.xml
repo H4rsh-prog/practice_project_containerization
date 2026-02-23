@@ -9,10 +9,10 @@
 		<relativePath/> <!-- lookup parent from repository -->
 	</parent>
 	<groupId>com.ecom</groupId>
-	<artifactId>EmailService</artifactId>
+	<artifactId>AuthService</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
-	<name>EmailService</name>
-	<description>email entity microservice</description>
+	<name>AuthService</name>
+	<description>authentication service for microservices</description>
 	<url/>
 	<licenses>
 		<license/>
@@ -44,13 +44,6 @@
 			<artifactId>spring-cloud-starter-netflix-eureka-client</artifactId>
 		</dependency>
 
-
-		<dependency>
-			<groupId>com.ecom</groupId>
-			<artifactId>class-factory</artifactId>
-			<version>1.0.0</version>
-		</dependency>
-
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-devtools</artifactId>
@@ -76,12 +69,6 @@
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-webmvc-test</artifactId>
 			<scope>test</scope>
-		</dependency>
-		<dependency>
-			<groupId>org.springframework.cloud</groupId>
-			<artifactId>spring-cloud-starter-hystrix</artifactId>
-			<version>1.4.5.RELEASE</version>
-			<scope>compile</scope>
 		</dependency>
 	</dependencies>
 	<dependencyManagement>

@@ -32,7 +32,7 @@ public class UserController {
 		return this.service.getEntitiesIterable(usernames);
 	}
 	@PostMapping("/")
-	public ResponseEntity<?> postUserEntity(@RequestBody com.ecom.factory.model.request.User userRequest) throws JsonProcessingException{
+	public ResponseEntity<?> postUserEntity(@RequestBody com.ecom.factory.model.request.User userRequest) throws Exception{
 		return this.service.saveUser(userRequest);
 	}
 }

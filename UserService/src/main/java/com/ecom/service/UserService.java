@@ -14,6 +14,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
+import com.ecom.dto.AuthClient;
 import com.ecom.dto.EmailClient;
 import com.ecom.dto.UserRepository;
 import com.ecom.factory.util.DEBUG;
@@ -34,6 +35,8 @@ public class UserService {
 	private ObjectMapper mapper;
 	@Autowired
 	private EmailClient emailClient;
+	@Autowired
+	private AuthClient authClient;
 	@Autowired
 	private DEBUG debugClient;
 	
@@ -124,8 +127,14 @@ public class UserService {
 		debugClient.print("FEIGN CLIENT RETURNED WITH THE RESPONSE "+clientResponse);
 		return clientResponse;
 	}
+	public ResponseEntity<?> saveAuthEntity(com.ecom.factory.model.response.Auth authBody){
+		debugClient.print("SENDING AUTH MAPPING REQUEST "+authBody);
+		ResponseEntity<?> clientResponse = authClient.postAuth(authBody);
+		debugClient.print("FEIGN CLIENT RETURNED WITH THE RESPONSE "+clientResponse);
+		return clientResponse;
+	}
 	@HystrixCommand(commandKey = "saveRevert", fallbackMethod = "revertSaveUser")
-	public ResponseEntity<?> saveUser(com.ecom.factory.model.request.User userRequest) {
+	public ResponseEntity<?> saveUser(com.ecom.factory.model.request.User userRequest) throws Exception {
 		debugClient.print("RECEIVED ENTITY SAVE REQUEST FOR "+userRequest);
 		ResponseEntity<?> responseEntity = this.availabilityCheck(userRequest);
 		if(responseEntity.getStatusCode().is4xxClientError()) return ResponseEntity.status(responseEntity.getStatusCode()).body(responseEntity.getBody());
@@ -153,6 +162,12 @@ public class UserService {
 					);
 			userResponse.setEmail(emailResponse);
 			debugClient.print("USER RESPONSE COMPILED");
+			//PARSING AUTH ENTITY OBJECT
+			com.ecom.factory.model.response.Auth authBody = this.mapper.readValue(userRequestJSON, com.ecom.factory.model.response.Auth.class);
+			authBody.setAuthorities(List.of("USER"));
+			authBody.setUserId(entity.getId());
+			responseEntity = saveAuthEntity(authBody);
+			if(!(responseEntity.getStatusCode().is2xxSuccessful())) throw new Exception("failed to save auth entity");
 			return ResponseEntity.status(HttpStatus.CREATED).body(userResponse);
 		} catch (JsonProcessingException e) {
 			debugClient.print("EXCEPTION CAUGHT WHILE PROCESSESING JSON VIA OBJECTMAPPER");
@@ -161,11 +176,14 @@ public class UserService {
 		return ResponseEntity.status(HttpStatus.EXPECTATION_FAILED).body("[SAVE-USER]	UNEXPECTED BYPASS DID NOT ENTER FALLBACK");
 	}
 	public ResponseEntity<?> revertSaveUser(com.ecom.factory.model.request.User userRequest){
+		debugClient.print("METHOD FAILED ENTERED FALLBACK-CLEANUP");
 		Optional<UserEntity> entity = this.repo.findByUsername(userRequest.getUsername());
 		if(entity.isPresent()) {
+			debugClient.print("ENTITY WAS SAVED");
 			this.repo.delete(entity.get());
 			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("[FALLBACK]	REVERTED ENTITY SAVE NO CHANGES WERE MADE");
 		}
+		debugClient.print("ENTITY WAS NOT SAVED");
 		return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("[FALLBACK]	ENTITY WAS NOT SAVED");
 	}
 }

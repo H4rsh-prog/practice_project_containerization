@@ -15,6 +15,8 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 
+import com.ecom.service.UserInfoService;
+
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
@@ -33,10 +35,10 @@ public class SecurityConfig {
 				.build();
 	}
 	@Bean
-	AuthenticationProvider getAuthProvider(UserDetailsService userDetailsService) {
+	AuthenticationProvider getAuthProvider() {
 		DaoAuthenticationProvider DaoAuth = new DaoAuthenticationProvider();
 		DaoAuth.setPasswordEncoder(getPasswordEncoder());
-		DaoAuth.setUserDetailsService(userDetailsService);
+		DaoAuth.setUserDetailsService(getUserDetailsService());
 		return DaoAuth;
 	}
 	@Bean
@@ -46,5 +48,9 @@ public class SecurityConfig {
 	@Bean
 	PasswordEncoder getPasswordEncoder() {
 		return new BCryptPasswordEncoder();
+	}
+	@Bean
+	UserDetailsService getUserDetailsService() {
+		return new UserInfoService();
 	}
 }

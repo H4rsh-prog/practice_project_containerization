@@ -9,11 +9,9 @@ import lombok.NoArgsConstructor;
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
-public class User {
+public class Auth {
 	@JsonProperty("username")
 	private String username;
 	@JsonProperty("password")
 	private String password;
-	@JsonProperty("email_address")
-	private String emailAddress;
 }

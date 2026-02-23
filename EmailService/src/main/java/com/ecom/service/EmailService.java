@@ -13,6 +13,7 @@ import com.ecom.factory.util.DEBUG;
 import com.ecom.model.entity.EmailEntity;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.netflix.hystrix.contrib.javanica.annotation.HystrixCommand;
 
 @Service
 public class EmailService {
@@ -36,24 +37,36 @@ public class EmailService {
 		this.debugClient.print("CHECKING EMAIL AVAILABILITY FOR ADDRESS "+address);
 		return !this.repo.existsByAddress(address);
 	}
-	public ResponseEntity<?> mapEmail(com.ecom.factory.model.request.Email emailRequest) throws JsonProcessingException{
-		String json = this.mapper.writeValueAsString(emailRequest);
-		this.debugClient.print("RECEIVED MAPPING REQUEST FOR THE EMAIL ENTITY "+this.mapper.readValue(json, EmailEntity.class));
-		Optional<EmailEntity> entity = Optional.of(
-			this.repo.save(
-				this.mapper.readValue(json, EmailEntity.class)
-			));
-		if(entity.isEmpty()) {
-			this.debugClient.print("MAPPING FAILED");
-			return ResponseEntity.status(HttpStatus.SC_BAD_REQUEST).body("COULD NOT MAP EMAIL TO USER");
+	@HystrixCommand(commandKey = "mapRevert", fallbackMethod = "revertMapEmail")
+	public ResponseEntity<?> mapEmail(com.ecom.factory.model.request.Email emailRequest) {
+		try {
+			String json = this.mapper.writeValueAsString(emailRequest);
+			Optional<EmailEntity> entity = Optional.of(this.mapper.readValue(json, EmailEntity.class));
+			this.debugClient.print("RECEIVED MAPPING REQUEST FOR THE EMAIL ENTITY "+entity.get());
+			entity = Optional.of(this.repo.save(entity.get()));
+			this.debugClient.print("MAPPING SUCCEEDED");
+			return ResponseEntity.status(HttpStatus.SC_ACCEPTED).body(
+				this.mapper.readValue(
+						this.mapper.writeValueAsString(entity),
+						com.ecom.factory.model.response.Email.class
+					)
+				);
+		} catch(JsonProcessingException e) {
+			debugClient.print("EXCEPTION CAUGHT WHILE PROCESSESING JSON VIA OBJECTMAPPER");
+			debugClient.print(e.getMessage());
 		}
-		this.debugClient.print("MAPPING SUCCEEDED");
-		return ResponseEntity.status(HttpStatus.SC_ACCEPTED).body(
-			this.mapper.readValue(
-					this.mapper.writeValueAsString(entity),
-					com.ecom.factory.model.response.Email.class
-				)
-			);
+		return ResponseEntity.status(HttpStatus.SC_EXPECTATION_FAILED).body("[MAP-EMAIL]	UNEXPECTED BYPASS DID NOT ENTER FALLBACK");
+	}
+	public ResponseEntity<?> revertMapEmail(com.ecom.factory.model.request.Email emailRequest) {
+		debugClient.print("METHOD FAILED ENTERED FALLBACK-CLEANUP");
+		Optional<EmailEntity> entity = this.repo.findById(emailRequest.getId());
+		if(entity.isPresent()) {
+			debugClient.print("ENTITY WAS SAVED");
+			this.repo.delete(entity.get());
+			return ResponseEntity.status(HttpStatus.SC_INTERNAL_SERVER_ERROR).body("[FALLBACK]	REVERTED ENTITY SAVE NO CHANGES WERE MADE");
+		}
+		debugClient.print("ENTITY WAS NOT SAVED");
+		return ResponseEntity.status(HttpStatus.SC_INTERNAL_SERVER_ERROR).body("[FALLBACK]	ENTITY WAS NOT SAVED");
 	}
 	public ResponseEntity<?> getEntitiesIterable(List<String> userIdList) {
 		return ResponseEntity.ok(this.repo.findAllById(userIdList));
