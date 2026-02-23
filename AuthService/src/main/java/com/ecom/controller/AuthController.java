@@ -25,6 +25,10 @@ public class AuthController {
 	@Autowired
 	private com.ecom.factory.util.DEBUG debugClient;
 	
+	@GetMapping("/")
+	public String baseGet() {
+		return "AUTH SERVICE IS RUNNING";
+	}
 	@GetMapping("{username}")
 	public ResponseEntity<?> getAuth(@PathVariable("username") String username){
 		debugClient.print("RECEIVED REQUEST TO FETCH AUTH ENTITY FOR "+username);
@@ -33,8 +37,8 @@ public class AuthController {
 		debugClient.print("AUTH ENTITY FOUND "+entity.get());
 		try {
 			return ResponseEntity.status(HttpStatus.OK).body(this.mapper.readValue(
-						this.mapper.writeValueAsString(entity.get())
-						, com.ecom.factory.model.response.Auth.class)
+						this.mapper.writeValueAsString(entity.get()),
+						com.ecom.factory.model.response.Auth.class)
 					);
 		} catch (JsonProcessingException e) {
 			debugClient.print("EXCEPTION CAUGHT WHILE PROCESSESING JSON VIA OBJECTMAPPER");

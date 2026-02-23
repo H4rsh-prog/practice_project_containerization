@@ -5,7 +5,9 @@ import java.util.List;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 import jakarta.persistence.Column;
+import jakarta.persistence.ElementCollection;
 import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Index;
 import jakarta.persistence.Table;
@@ -29,5 +31,6 @@ public class AuthEntity {
 	@JsonProperty("password")
 	private String password;
 	@JsonProperty("auth_authorities")
+	@ElementCollection(fetch = FetchType.EAGER)
 	private List<String> authorities;
 }
