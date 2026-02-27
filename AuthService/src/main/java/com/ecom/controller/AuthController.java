@@ -55,8 +55,7 @@ public class AuthController {
 						, AuthEntity.class)
 					);
 			debugClient.print("SAVED ENTITY "+savedEntity);
-			if(savedEntity!=null) return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("UNABLE TO SAVE ENTITY");
-			return ResponseEntity.ok("AUTH SAVED");
+			return ResponseEntity.ok(savedEntity);
 		} catch (JsonProcessingException e) {
 			debugClient.print("EXCEPTION CAUGHT WHILE PROCESSESING JSON VIA OBJECTMAPPER");
 			debugClient.print(e.getMessage());

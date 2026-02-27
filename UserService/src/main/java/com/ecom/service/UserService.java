@@ -144,7 +144,6 @@ public class UserService {
 	}
 	@HystrixCommand(commandKey = "saveRevert", fallbackMethod = "revertSaveUser")
 	public ResponseEntity<?> saveUser(com.ecom.factory.model.request.User userRequest) throws Exception {
-		debugClient.print("password = "+userRequest.getPassword());
 		debugClient.print("RECEIVED ENTITY SAVE REQUEST FOR "+userRequest);
 		ResponseEntity<?> responseEntity = this.availabilityCheck(userRequest);
 		if(responseEntity.getStatusCode().is4xxClientError()) return ResponseEntity.status(responseEntity.getStatusCode()).body(responseEntity.getBody());

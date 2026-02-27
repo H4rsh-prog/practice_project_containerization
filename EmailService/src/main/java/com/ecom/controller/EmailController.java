@@ -41,7 +41,7 @@ public class EmailController {
 		return this.service.getEntitiesIterable(userids);
 	}
 	@PostMapping("/")
-	public ResponseEntity<?> postEmailEntity(@RequestBody com.ecom.factory.model.request.Email emailRequest) throws JsonProcessingException{
+	public ResponseEntity<?> postEmailEntity(@RequestBody com.ecom.factory.model.request.Email emailRequest) throws Exception{
 		return this.service.mapEmail(emailRequest);
 	}
 	@DeleteMapping("/{id}")

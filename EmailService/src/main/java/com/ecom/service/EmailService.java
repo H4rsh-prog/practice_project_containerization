@@ -38,13 +38,13 @@ public class EmailService {
 		return !this.repo.existsByAddress(address);
 	}
 	@HystrixCommand(commandKey = "mapRevert", fallbackMethod = "revertMapEmail")
-	public ResponseEntity<?> mapEmail(com.ecom.factory.model.request.Email emailRequest) {
+	public ResponseEntity<?> mapEmail(com.ecom.factory.model.request.Email emailRequest) throws Exception {
 		try {
 			String json = this.mapper.writeValueAsString(emailRequest);
 			Optional<EmailEntity> entity = Optional.of(this.mapper.readValue(json, EmailEntity.class));
 			this.debugClient.print("RECEIVED MAPPING REQUEST FOR THE EMAIL ENTITY "+entity.get());
 			entity = Optional.of(this.repo.save(entity.get()));
-			this.debugClient.print("MAPPING SUCCEEDED");
+			debugClient.print("SAVED ENTITY "+entity.get());
 			return ResponseEntity.status(HttpStatus.SC_ACCEPTED).body(
 				this.mapper.readValue(
 						this.mapper.writeValueAsString(entity),

@@ -8,7 +8,10 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
+import lombok.Getter;
+
 public class UserInfo implements UserDetails {
+	@Getter
 	private com.ecom.factory.model.response.Auth authUser;
 	private List<SimpleGrantedAuthority> authorities = new ArrayList<>();
 	public UserInfo(com.ecom.factory.model.response.Auth authUser) {
