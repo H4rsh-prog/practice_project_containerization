@@ -1,22 +1,22 @@
 services:
   gateway:
     build:
-      context: ./ApiGateway/
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: ApiGateway/Dockerfile
     ports:
       - "8000:8000"
     depends_on:
       - lb 
   lb:
     build: 
-      context: ./DiscoveryService/
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: /DiscoveryService/Dockerfile
     ports:
       - "8761:8761"
   user-service:
     build: 
-      context: ./UserService/
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: /UserService/Dockerfile
     ports:
       - "8010:8010"
     depends_on:
@@ -24,8 +24,8 @@ services:
       - db
   email-service:
     build: 
-      context: ./EmailService/
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: /EmailService/Dockerfile
     ports:
       - "8020:8020"
     depends_on:

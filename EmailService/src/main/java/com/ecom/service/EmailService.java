@@ -71,4 +71,10 @@ public class EmailService {
 	public ResponseEntity<?> getEntitiesIterable(List<String> userIdList) {
 		return ResponseEntity.ok(this.repo.findAllById(userIdList));
 	}
+	public ResponseEntity<?> deleteEmailEntity(String user_id) {
+		Optional<EmailEntity> entity = this.repo.findById(user_id);
+		if(entity.isEmpty()) return ResponseEntity.status(HttpStatus.SC_NOT_FOUND).body("ENTITY DOES NOT EXIST");
+		this.repo.delete(entity.get());
+		return ResponseEntity.status(HttpStatus.SC_ACCEPTED).body("SUCCESSFULLY DELETED ENTITY");
+	}
 }

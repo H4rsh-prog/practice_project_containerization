@@ -1,5 +1,7 @@
 package com.ecom.service;
 
+import java.io.File;
+import java.io.FileReader;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -23,12 +25,14 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.netflix.hystrix.contrib.javanica.annotation.HystrixCommand;
-
+import com.netflix.hystrix.contrib.javanica.aop.aspectj.HystrixCommandAspect;
 import feign.FeignException;
 import jakarta.annotation.PostConstruct;
 
 @Service
 public class UserService {
+
+    private final HystrixCommandAspect getHystrixCommandAspect;
 	@Autowired
 	private UserRepository repo;
 	@Autowired
@@ -39,6 +43,11 @@ public class UserService {
 	private AuthClient authClient;
 	@Autowired
 	private DEBUG debugClient;
+
+
+    UserService(HystrixCommandAspect getHystrixCommandAspect) {
+        this.getHystrixCommandAspect = getHystrixCommandAspect;
+    }
 	
 	
 	public ResponseEntity<?> getUserByUsername(String username) throws JsonProcessingException{
@@ -135,6 +144,7 @@ public class UserService {
 	}
 	@HystrixCommand(commandKey = "saveRevert", fallbackMethod = "revertSaveUser")
 	public ResponseEntity<?> saveUser(com.ecom.factory.model.request.User userRequest) throws Exception {
+		debugClient.print("password = "+userRequest.getPassword());
 		debugClient.print("RECEIVED ENTITY SAVE REQUEST FOR "+userRequest);
 		ResponseEntity<?> responseEntity = this.availabilityCheck(userRequest);
 		if(responseEntity.getStatusCode().is4xxClientError()) return ResponseEntity.status(responseEntity.getStatusCode()).body(responseEntity.getBody());
@@ -181,6 +191,7 @@ public class UserService {
 		if(entity.isPresent()) {
 			debugClient.print("ENTITY WAS SAVED");
 			this.repo.delete(entity.get());
+			this.emailClient.deleteEmailEntity(entity.get().getId());
 			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("[FALLBACK]	REVERTED ENTITY SAVE NO CHANGES WERE MADE");
 		}
 		debugClient.print("ENTITY WAS NOT SAVED");

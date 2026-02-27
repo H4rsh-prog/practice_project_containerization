@@ -2,10 +2,10 @@ package com.ecom.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
-import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -23,12 +23,13 @@ public class SecurityConfig {
 	@Bean
 	SecurityFilterChain getSecurityFilterChain(HttpSecurity http) throws Exception {
 		return http.csrf(CSRF->CSRF.disable())
-				.httpBasic(Customizer.withDefaults())
+				.httpBasic(BASIC->BASIC.disable())
 				.formLogin(FORM->FORM.disable())
 				.authorizeHttpRequests(request->request
-					.requestMatchers("/generateToken").permitAll()
-					.requestMatchers("/UserService/**").hasAnyAuthority("USER","ADMIN")
-					.requestMatchers("/EmailService/**").hasAnyAuthority("ADMIN")
+					.requestMatchers("/generateToken", "/user/status", "/email/status", "/auth/status").permitAll()
+					.requestMatchers(HttpMethod.POST, "/user/").permitAll()
+					.requestMatchers("/user/**").hasAnyAuthority("USER","ADMIN")
+					.requestMatchers("/email/**").hasAnyAuthority("ADMIN")
 					.anyRequest().authenticated()
 				)
 				.sessionManagement(SESSION->SESSION.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
