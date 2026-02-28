@@ -3,78 +3,64 @@ package com.ecom.service;
 import java.util.List;
 import java.util.Optional;
 
-import org.apache.http.HttpStatus;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
 import com.ecom.dto.EmailRepository;
 import com.ecom.factory.util.DEBUG;
 import com.ecom.model.entity.EmailEntity;
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.netflix.hystrix.contrib.javanica.annotation.HystrixCommand;
 
 @Service
 public class EmailService {
 	@Autowired
 	private EmailRepository repo;
 	@Autowired
-	private ObjectMapper mapper;
-	@Autowired
 	private DEBUG debugClient;
 	
-	public ResponseEntity<?> getEmailById(String id) throws JsonProcessingException{
+	public Optional<EmailEntity> getEmailById(String id) throws JsonProcessingException{
+		debugClient.print("FETCH REQUEST FOR ID "+id);
 		Optional<EmailEntity> entity = this.repo.findById(id);
-		if(entity.isEmpty()) return ResponseEntity.status(HttpStatus.SC_NOT_FOUND).body("ENTITY NOT FOUND IN TABLE");
-		String json = this.mapper.writeValueAsString(entity.get());
-		this.debugClient.print("EMAIL ENTITY FETCHED "+entity.get());
-		return ResponseEntity.status(HttpStatus.SC_ACCEPTED).body(
-				this.mapper.readValue(json, com.ecom.factory.model.response.Email.class)
-			);
+		debugClient.print("ENTITY = "+entity.get());
+		return entity;
 	}
 	public boolean checkAddressAvailability(String address) {
 		this.debugClient.print("CHECKING EMAIL AVAILABILITY FOR ADDRESS "+address);
 		return !this.repo.existsByAddress(address);
 	}
-	@HystrixCommand(commandKey = "mapRevert", fallbackMethod = "revertMapEmail")
-	public ResponseEntity<?> mapEmail(com.ecom.factory.model.request.Email emailRequest) throws Exception {
-		try {
-			String json = this.mapper.writeValueAsString(emailRequest);
-			Optional<EmailEntity> entity = Optional.of(this.mapper.readValue(json, EmailEntity.class));
-			this.debugClient.print("RECEIVED MAPPING REQUEST FOR THE EMAIL ENTITY "+entity.get());
-			entity = Optional.of(this.repo.save(entity.get()));
-			debugClient.print("SAVED ENTITY "+entity.get());
-			return ResponseEntity.status(HttpStatus.SC_ACCEPTED).body(
-				this.mapper.readValue(
-						this.mapper.writeValueAsString(entity),
-						com.ecom.factory.model.response.Email.class
-					)
-				);
-		} catch(JsonProcessingException e) {
-			debugClient.print("EXCEPTION CAUGHT WHILE PROCESSESING JSON VIA OBJECTMAPPER");
-			debugClient.print(e.getMessage());
+	public Optional<EmailEntity> mapEmail(EmailEntity entity) throws Exception {
+		this.debugClient.print("RECEIVED MAPPING REQUEST FOR THE EMAIL ENTITY "+entity);
+		entity = this.repo.save(entity);
+		debugClient.print("RETURNING SAVED ENTITY "+entity);
+		return Optional.of(entity);
+	}
+	public List<EmailEntity> getEntitiesIterable(List<String> userIdList) {
+		debugClient.print("FETCH REQUEST FOR LIST OF IDs");
+		List<EmailEntity> entity_list = (List<EmailEntity>) this.repo.findAllById(userIdList);
+		debugClient.print("RETURNING FOUND ENTITIES "+entity_list);
+		return entity_list;
+	}
+	public boolean deleteEntityById(String id) {
+		debugClient.print("DELETE REQUEST FOR ID "+id);
+		if(this.repo.existsById(id)) {
+			debugClient.print("ENTITY EXISTS");
+			this.repo.deleteById(id);
+			debugClient.print("ENTITY DELETED");
+			return true;
 		}
-		return ResponseEntity.status(HttpStatus.SC_EXPECTATION_FAILED).body("[MAP-EMAIL]	UNEXPECTED BYPASS DID NOT ENTER FALLBACK");
+		return false;
 	}
-	public ResponseEntity<?> revertMapEmail(com.ecom.factory.model.request.Email emailRequest) {
-		debugClient.print("METHOD FAILED ENTERED FALLBACK-CLEANUP");
-		Optional<EmailEntity> entity = this.repo.findById(emailRequest.getId());
-		if(entity.isPresent()) {
-			debugClient.print("ENTITY WAS SAVED");
-			this.repo.delete(entity.get());
-			return ResponseEntity.status(HttpStatus.SC_INTERNAL_SERVER_ERROR).body("[FALLBACK]	REVERTED ENTITY SAVE NO CHANGES WERE MADE");
+	public Optional<EmailEntity> updateEntity(EmailEntity entity){
+		debugClient.print("DELETE REQUEST FOR ID "+entity);
+		if(this.repo.existsById(entity.getId())) {
+			debugClient.print("ENTITY EXISTS");
+			Optional<EmailEntity> curEntity = this.repo.findById(entity.getId());
+			entity = this.repo.save(entity);
+			debugClient.print("UPDATED ENTITY "+curEntity+" --> "+entity);
+			return Optional.of(entity);
+		} else {
+			debugClient.print("ENTITY DOES NOT EXIST");
 		}
-		debugClient.print("ENTITY WAS NOT SAVED");
-		return ResponseEntity.status(HttpStatus.SC_INTERNAL_SERVER_ERROR).body("[FALLBACK]	ENTITY WAS NOT SAVED");
-	}
-	public ResponseEntity<?> getEntitiesIterable(List<String> userIdList) {
-		return ResponseEntity.ok(this.repo.findAllById(userIdList));
-	}
-	public ResponseEntity<?> deleteEmailEntity(String user_id) {
-		Optional<EmailEntity> entity = this.repo.findById(user_id);
-		if(entity.isEmpty()) return ResponseEntity.status(HttpStatus.SC_NOT_FOUND).body("ENTITY DOES NOT EXIST");
-		this.repo.delete(entity.get());
-		return ResponseEntity.status(HttpStatus.SC_ACCEPTED).body("SUCCESSFULLY DELETED ENTITY");
+		return Optional.of(null);
 	}
 }

@@ -7,6 +7,7 @@ import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
+import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -29,7 +30,7 @@ public class SecurityConfig {
 	SecurityFilterChain getSecurityFilterChain(HttpSecurity http) throws Exception {
 		return http.csrf(CSRF->CSRF.disable())
 				.httpBasic(BASIC->BASIC.disable())
-				.formLogin(FORM->FORM.disable())
+				.formLogin(Customizer.withDefaults())
 				.authorizeHttpRequests(request->request
 					.requestMatchers("/user/generateToken", "/user/status", "/email/status", "/auth/status").permitAll()
 					.requestMatchers(HttpMethod.POST, "/user/").permitAll()
@@ -37,7 +38,7 @@ public class SecurityConfig {
 					.requestMatchers("/email/**").hasAnyAuthority("ADMIN")
 					.anyRequest().authenticated()
 				)
-				.sessionManagement(SESSION->SESSION.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+//				.sessionManagement(SESSION->SESSION.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 				.addFilterBefore(this.jwtFilter , UsernamePasswordAuthenticationFilter.class)
 				.build();
 	}

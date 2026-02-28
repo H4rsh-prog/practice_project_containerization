@@ -14,6 +14,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Fallback;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import com.ecom.dto.AuthClient;
@@ -32,8 +34,7 @@ import jakarta.annotation.PostConstruct;
 @Service
 public class UserService {
 
-    private final HystrixCommandAspect getHystrixCommandAspect;
-	@Autowired
+    @Autowired
 	private UserRepository repo;
 	@Autowired
 	private ObjectMapper mapper;
@@ -43,12 +44,7 @@ public class UserService {
 	private AuthClient authClient;
 	@Autowired
 	private DEBUG debugClient;
-
-
-    UserService(HystrixCommandAspect getHystrixCommandAspect) {
-        this.getHystrixCommandAspect = getHystrixCommandAspect;
-    }
-	
+	private BCryptPasswordEncoder encoder = new BCryptPasswordEncoder();
 	
 	public ResponseEntity<?> getUserByUsername(String username) throws JsonProcessingException{
 		com.ecom.factory.model.response.User userResponse;
@@ -130,17 +126,17 @@ public class UserService {
 		debugClient.print("ENTITY SAVED WITH ID "+savedEntity.get().getId());
 		return ResponseEntity.ok(savedEntity.get());
 	}
-	public ResponseEntity<?> saveEmailEntity(com.ecom.factory.model.request.Email emailRequest){
+	public boolean saveEmailEntity(com.ecom.factory.model.request.Email emailRequest){
 		debugClient.print("SENDING EMAIL MAPPING REQUEST "+emailRequest);
-		ResponseEntity<?> clientResponse = emailClient.postEmailEntity(emailRequest);
-		debugClient.print("FEIGN CLIENT RETURNED WITH THE RESPONSE "+clientResponse);
-		return clientResponse;
+		Optional<com.ecom.factory.model.request.Email> emailResponse = emailClient.postEmailEntity(emailRequest);
+		debugClient.print("FEIGN CLIENT RETURNED WITH THE RESPONSE "+emailResponse.get());
+		return emailResponse.isPresent();
 	}
-	public ResponseEntity<?> saveAuthEntity(com.ecom.factory.model.response.Auth authBody){
+	public boolean saveAuthEntity(com.ecom.factory.model.response.Auth authBody){
 		debugClient.print("SENDING AUTH MAPPING REQUEST "+authBody);
-		ResponseEntity<?> clientResponse = authClient.postAuth(authBody);
-		debugClient.print("FEIGN CLIENT RETURNED WITH THE RESPONSE "+clientResponse);
-		return clientResponse;
+		Optional<com.ecom.factory.model.response.Auth> authResponse = authClient.postAuth(authBody);
+		debugClient.print("FEIGN CLIENT RETURNED WITH THE RESPONSE "+authResponse);
+		return authResponse.isPresent();
 	}
 	@HystrixCommand(commandKey = "saveRevert", fallbackMethod = "revertSaveUser")
 	public ResponseEntity<?> saveUser(com.ecom.factory.model.request.User userRequest) throws Exception {
@@ -172,17 +168,18 @@ public class UserService {
 			userResponse.setEmail(emailResponse);
 			debugClient.print("USER RESPONSE COMPILED");
 			//PARSING AUTH ENTITY OBJECT
-			com.ecom.factory.model.response.Auth authBody = this.mapper.readValue(userRequestJSON, com.ecom.factory.model.response.Auth.class);
-			authBody.setAuthorities(List.of("USER"));
-			authBody.setUserId(entity.getId());
-			responseEntity = saveAuthEntity(authBody);
-			if(!(responseEntity.getStatusCode().is2xxSuccessful())) throw new Exception("failed to save auth entity");
+			com.ecom.factory.model.response.Auth authBody = new com.ecom.factory.model.response.Auth(
+						entity.getId(),
+						this.encoder.encode(userRequest.getPassword()),
+						List.of("USER")
+					);
+			saveAuthEntity(authBody);
 			return ResponseEntity.status(HttpStatus.CREATED).body(userResponse);
 		} catch (JsonProcessingException e) {
 			debugClient.print("EXCEPTION CAUGHT WHILE PROCESSESING JSON VIA OBJECTMAPPER");
 			debugClient.print(e.getMessage());
 		}
-		return ResponseEntity.status(HttpStatus.EXPECTATION_FAILED).body("[SAVE-USER]	UNEXPECTED BYPASS DID NOT ENTER FALLBACK");
+		throw new Exception("[SAVE-USER]	UNEXPECTED BYPASS DID NOT ENTER FALLBACK");
 	}
 	public ResponseEntity<?> revertSaveUser(com.ecom.factory.model.request.User userRequest){
 		debugClient.print("METHOD FAILED ENTERED FALLBACK-CLEANUP");

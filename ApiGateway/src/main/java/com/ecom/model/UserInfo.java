@@ -33,7 +33,7 @@ public class UserInfo implements UserDetails {
 
 	@Override
 	public String getUsername() {
-		return this.authUser.getUsername();
+		return this.authUser.getUserId();
 	}
 
 	@Override

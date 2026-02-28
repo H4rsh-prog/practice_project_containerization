@@ -14,8 +14,6 @@ import lombok.NoArgsConstructor;
 public class Auth {
 	@JsonProperty("user_id")
 	private String userId;
-	@JsonProperty("username")
-	private String username;
 	@JsonProperty("password")
 	private String password;
 	@JsonProperty("auth_authorities")
