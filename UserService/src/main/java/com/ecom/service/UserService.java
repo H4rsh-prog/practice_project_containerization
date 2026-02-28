@@ -47,31 +47,31 @@ public class UserService {
 	private BCryptPasswordEncoder encoder = new BCryptPasswordEncoder();
 	
 	public ResponseEntity<?> getUserByUsername(String username) throws JsonProcessingException{
-		com.ecom.factory.model.response.User userResponse;
+		debugClient.print("FETCH COMPILE REQUEST FOR USERNAME "+username);
+		//FETCHING USER ENTITY
 		Optional<UserEntity> userEntity = this.repo.findByUsername(username);
-		debugClient.print("FETCHED ENTITY WITH THE USERNAME "+username+" : "+userEntity.get());
-		if(userEntity.isEmpty()) {
-			return ResponseEntity.status(HttpStatus.NOT_FOUND).body("USER ENTITY DOES NOT EXIST");
-		}
-		userResponse = this.mapper.readValue(this.mapper.writeValueAsString(userEntity), com.ecom.factory.model.response.User.class);
-		debugClient.print("SENDING REQUEST TO FETCH EMAIL ENTITY WITH THE ID "+userEntity.get().getId());
+		if(userEntity.isEmpty()) return ResponseEntity.status(HttpStatus.NOT_FOUND).body("USER ENTITY DOES NOT EXIST");
+		debugClient.print("USER ENTITY FOUND "+userEntity);
+		com.ecom.factory.model.response.User response = this.mapper.convertValue(userEntity.get(), com.ecom.factory.model.response.User.class);
+		//FETCHING EMAIL ENTITY
+		Optional<com.ecom.factory.model.request.Email> emailEntity = this.emailClient.getEmailEntity(userEntity.get().getId());
+		if(emailEntity.isEmpty()) { 
+			debugClient.print("UNRESOLVED ID-EMAIL MAPPING");
+		} else debugClient.print("EMAIL ENTITY FOUND "+emailEntity);
 		try {
-			ResponseEntity<?> clientResponse = this.emailClient.getEmailEntity(userEntity.get().getId());
-			debugClient.print("FEIGN CLIENT RETURNED WITH RESPONSE "+clientResponse);
-			com.ecom.factory.model.response.Email emailResponse = this.mapper.readValue(
-					this.mapper.writeValueAsString(clientResponse.getBody()), com.ecom.factory.model.response.Email.class
-				);
-			userResponse.setEmail(emailResponse);
-			return ResponseEntity.status(HttpStatus.OK).body(userResponse);
-		} catch (FeignException e) {
-			debugClient.print("FEIGN CLIENT FAILED");
-			debugClient.print("RETURNING INCOMPLETE OBJECT OF USER ENTITY");
-			return ResponseEntity.status(HttpStatus.PARTIAL_CONTENT).body(userResponse);
+			response = this.mapper.readerForUpdating(response).readValue(
+						this.mapper.writeValueAsString(emailEntity.get()));
 		} catch (Exception e) {
-			e.printStackTrace();
+			debugClient.print("EXCEPTION CAUGHT IN PARSING JSON DATA FROM EMAIL ENTITY");
+			if (emailEntity.isEmpty()) debugClient.print("THIS EXCEPTION WAS THROWN DUE TO EMAIL ENTITY BEING NULL");
+			debugClient.print(e.getMessage());
 		}
-		return null;
+		//FETCHING AUTHORITIES
+		List<String> authorityList = this.authClient.getAuthorities(userEntity.get().getId());
+		response.setAuthorities(authorityList);
+		return ResponseEntity.status(HttpStatus.FOUND).body(response);
 	}
+	// OPTIMISE THESE V
 	
 	public ResponseEntity<?> getEntitiesIterable(List<String> usernameList){
 		debugClient.print("RECEIVED FETCH REQUEST FOR THE LIST "+usernameList);

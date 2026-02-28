@@ -1,5 +1,7 @@
 package com.ecom.factory.model.response;
 
+import java.util.List;
+
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 import lombok.AllArgsConstructor;
@@ -14,4 +16,6 @@ public class User {
 	private String username;
 	@JsonProperty("email")
 	private com.ecom.factory.model.response.Email email;
+	@JsonProperty("authorities")
+	private List<String> authorities;
 }

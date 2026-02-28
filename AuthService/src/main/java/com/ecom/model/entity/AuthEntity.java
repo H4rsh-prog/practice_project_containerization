@@ -2,9 +2,6 @@ package com.ecom.model.entity;
 
 import java.util.List;
 
-import org.hibernate.annotations.Cascade;
-import org.hibernate.annotations.CascadeType;
-
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 import jakarta.persistence.Column;
@@ -29,6 +26,5 @@ public class AuthEntity {
 	private String password;
 	@JsonProperty("auth_authorities")
 	@ElementCollection(fetch = FetchType.EAGER)
-	@Cascade(CascadeType.ALL)
 	private List<String> authorities;
 }

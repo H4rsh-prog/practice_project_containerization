@@ -1,5 +1,6 @@
 package com.ecom.controller;
 
+import java.util.List;
 import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -24,8 +25,8 @@ public class AuthController {
 	public String baseGet() {
 		return "AUTH SERVICE IS RUNNING";
 	}
-	@GetMapping("{username}")
-	public Optional<AuthEntity> getAuth(@PathVariable("username") String id){
+	@GetMapping("{id}")
+	public Optional<AuthEntity> getAuth(@PathVariable("id") String id){
 		debugClient.print("RECEIVED REQUEST TO FETCH AUTH ENTITY FOR "+id);
 		Optional<AuthEntity> entity = this.repo.findById(id);
 		if(entity.isEmpty()) {
@@ -34,6 +35,13 @@ public class AuthController {
 			debugClient.print("RETURNING FOUND AUTH ENTITY "+entity);
 		}
 		return entity;
+	}
+	@GetMapping("/authorities/{id}")
+	public List<String> getAuthorities(@PathVariable("id") String id){
+		debugClient.print("RECEIVED REQUEST TO FETCH AUTHORITY LIST FOR "+id);
+		List<String> authorities = this.repo.getAuthorities(id);
+		debugClient.print("RETURNING FETCHED LIST "+authorities);
+		return authorities;
 	}
 	@PostMapping("/")
 	public Optional<AuthEntity> postAuth(@RequestBody AuthEntity entity){
